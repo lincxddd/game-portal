@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Game Portal</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+  <style>
+    * { box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; }
+    body { margin: 0; background: #f1f5f9; padding: 24px; color: #000; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    h1 { margin: 0; font-size: 28px; }
+    .sub { color: #64748b; font-size: 14px; }
+
+    .add-bar { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 12px; margin-bottom: 16px; }
+    .sync-bar { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; margin-bottom: 32px; }
+
+    input, textarea { padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; }
+    textarea { resize: vertical; min-height: 44px; }
+
+    button { padding: 10px 16px; border-radius: 8px; border: none; background: #2563eb; color: white; cursor: pointer; font-size: 14px; }
+    button.secondary { background: #475569; }
+    button.danger { background: #ef4444; }
+    button:hover { filter: brightness(0.95); }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 24px; }
+
+    .card { background: white; border-radius: 16px; height: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; text-decoration: none; color: black; box-shadow: 0 4px 10px rgba(0,0,0,0.08); transition: transform 0.2s, box-shadow 0.2s; position: relative; }
+    .card:hover { transform: scale(1.05); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
+
+    .icon { width: 48px; height: 48px; border-radius: 12px; background: #64748b; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .icon img { width: 100%; height: 100%; object-fit: cover; }
+
+    .delete { position: absolute; top: 6px; right: 8px; font-size: 12px; color: #94a3b8; cursor: pointer; user-select: none; }
+    .delete:hover { color: #ef4444; }
+
+    .note { color: #64748b; font-size: 12px; margin-bottom: 8px; }
+
+    /* ---------- DARK MODE ---------- */
+    body.dark {
+      background: #0f172a;
+      color: #e5e7eb;
+    }
+
+    body.dark .sub,
+    body.dark .note {
+      color: #94a3b8;
+    }
+
+    body.dark input,
+    body.dark textarea {
+      background: #020617;
+      color: #e5e7eb;
+      border: 1px solid #334155;
+    }
+
+    body.dark .card {
+      background: #020617;
+      color: #e5e7eb;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+
+    body.dark .icon {
+      background: #334155;
+    }
+
+    body.dark button.secondary {
+      background: #334155;
+    }
+
+    body.dark button {
+      background: #3b82f6;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Game Portal</h1>
+    <div style="display:flex; gap:12px; align-items:center;">
+      <div class="sub">Dashboard</div>
+      <button class="secondary" onclick="toggleDarkMode()">🌙</button>
+    </div>
+  </header>
+
+  <div class="add-bar">
+    <input id="name" placeholder="Game / site name" />
+    <input id="url" placeholder="https://website.com" />
+    <input id="icon" placeholder="Icon image URL (optional)" />
+    <button onclick="addApp()">Add</button>
+  </div>
+
+  <div class="note">Sync across devices: copy the code below and paste it on another device.</div>
+  <div class="sync-bar">
+    <textarea id="syncCode" placeholder="Your library code will appear here" readonly></textarea>
+    <button class="secondary" onclick="copyCode()">Copy</button>
+    <button onclick="importCode()">Load Code</button>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <script>
+    const STORAGE_KEY = 'game-portal-apps';
+    const THEME_KEY = 'game-portal-theme';
+
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark');
+      localStorage.setItem(
+        THEME_KEY,
+        document.body.classList.contains('dark') ? 'dark' : 'light'
+      );
+    }
+
+    if (localStorage.getItem(THEME_KEY) === 'dark') {
+      document.body.classList.add('dark');
+    }
+
+    function getApps() {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    }
+
+    function saveApps(apps) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(apps));
+      updateSyncCode();
+    }
+
+    function renderApps() {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      const apps = getApps();
+
+      apps.forEach((app, index) => {
+        const card = document.createElement('a');
+        card.className = 'card';
+        card.href = app.url;
+        card.target = '_blank';
+
+        const icon = document.createElement('div');
+        icon.className = 'icon';
+        if (app.icon) {
+          const img = document.createElement('img');
+          img.src = app.icon;
+          icon.appendChild(img);
+        }
+
+        const label = document.createElement('div');
+        label.innerText = app.name;
+
+        const del = document.createElement('div');
+        del.className = 'delete';
+        del.innerText = '✕';
+        del.onclick = (e) => { e.preventDefault(); deleteApp(index); };
+
+        card.appendChild(del);
+        card.appendChild(icon);
+        card.appendChild(label);
+        grid.appendChild(card);
+      });
+    }
+
+    function addApp() {
+      const name = document.getElementById('name').value.trim();
+      const url = document.getElementById('url').value.trim();
+      const icon = document.getElementById('icon').value.trim();
+      if (!name || !url) return;
+
+      const apps = getApps();
+      apps.push({ name, url, icon });
+      saveApps(apps);
+      renderApps();
+
+      document.getElementById('name').value = '';
+      document.getElementById('url').value = '';
+      document.getElementById('icon').value = '';
+    }
+
+    function deleteApp(index) {
+      const apps = getApps();
+      apps.splice(index, 1);
+      saveApps(apps);
+      renderApps();
+    }
+
+    function updateSyncCode() {
+      const apps = getApps();
+      const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(apps))));
+      document.getElementById('syncCode').value = encoded;
+    }
+
+    function copyCode() {
+      const ta = document.getElementById('syncCode');
+      ta.select();
+      document.execCommand('copy');
+    }
+
+    function importCode() {
+      const input = prompt('Paste your Game Portal code here:');
+      if (!input) return;
+      try {
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(input))));
+        if (!Array.isArray(decoded)) throw new Error('Invalid');
+        saveApps(decoded);
+        renderApps();
+        alert('Library loaded successfully!');
+      } catch (e) {
+        alert('Invalid code. Make sure you copied it correctly.');
+      }
+    }
+
+    renderApps();
+    updateSyncCode();
+  </script>
+
+</body>
+</html>
